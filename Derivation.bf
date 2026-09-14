@@ -9,13 +9,15 @@ class Derivation
     {
         rootNode = null;
 
-        if (!input.StartsWith("begin ") || !input.EndsWith(" end"))
+        // 1. Check to see if input string has begin and end 
+        if (!input.StartsWith("begin") || !input.EndsWith("end"))
         {
-            Console.WriteLine("Error: Program must start with 'begin' and end with 'end'.");
+            Console.WriteLine("Error: Must start with 'begin' and end with 'end'.");
             return false;
         }
 
-        StringView body = input.Substring(6, input.Length - 10);
+        // 2. Extract the instructions from inside of begin and end
+        StringView body = input.Substring(5, input.Length - 8);
         body.Trim();
 
         if (body.IsEmpty)
@@ -24,89 +26,115 @@ class Derivation
             return false;
         }
 
-        List<StringView> rawInstructions = scope .();
+        // 3. Separate multiple instructions by '.'
+        List<StringView> instructions = scope .();
         for (var part in body.Split('.'))
         {
-            StringView p = part;
-            p.Trim();
-            if (!p.IsEmpty)
-                rawInstructions.Add(p);
+            StringView cleaned = part;
+            cleaned.Trim();
+            if (!cleaned.IsEmpty)
+            {
+                instructions.Add(cleaned);
+            }
         }
 
-        for (int i = 0; i < rawInstructions.Count; i++)
+        // 4. Validate every instruction
+        for (int i = 0; i < instructions.Count; i++)
         {
-            if (!ValidateInstruction(rawInstructions[i]))
+            if (!ValidateInstruction(instructions[i]))
+            {
                 return false;
+            }
         }
 
+        // 5. Print the step-by-step derivation
         Console.WriteLine("\n--- RIGHTMOST DERIVATION ---");
-        PrintRightmostDerivation(rawInstructions);
+        PrintDerivation(instructions);
 
-        rootNode = BuildTree(rawInstructions);
+        // 6. Build and return the tree
+        rootNode = BuildTree(instructions);
         return true;
     }
 
     private static bool ValidateInstruction(StringView inst)
     {
-        List<StringView> tokens = scope .();
+        // Split instruction into action (SQR/TRI) and coordinates
+        List<StringView> parts = scope .();
         for (var token in inst.Split(' '))
         {
-            StringView t = token;
-            t.Trim();
-            if (!t.IsEmpty)
-                tokens.Add(t);
+            StringView cleaned = token;
+            cleaned.Trim();
+            if (!cleaned.IsEmpty)
+            {
+                parts.Add(cleaned);
+            }
         }
 
-        if (tokens.Count != 2)
+        if (parts.Count != 2)
         {
             Console.WriteLine($"Error: Invalid instruction format '{inst}'");
             return false;
         }
 
-        StringView type = tokens[0];
-        StringView coords = tokens[1];
+        StringView command = parts[0];
+        StringView coordsString = parts[1];
 
+        // Check required coordinate count
         int expectedCoords = 0;
-        if (type == "SQR") expectedCoords = 2;
-        else if (type == "TRI") expectedCoords = 3;
+        if (command == "SQR")
+        {
+            expectedCoords = 2;
+        }
+        else if (command == "TRI")
+        {
+            expectedCoords = 3;
+        }
         else
         {
-            Console.WriteLine($"Error: Unrecognized command '{type}'");
+            Console.WriteLine($"Error: Unrecognized command '{command}'");
             return false;
         }
 
+        // Separate coordinates by '-'
         List<StringView> coordList = scope .();
-        for (var c in coords.Split('-'))
+        for (var c in coordsString.Split('-'))
         {
-            StringView coordStr = c;
-            coordStr.Trim();
-            if (!coordStr.IsEmpty)
-                coordList.Add(coordStr);
+            StringView cleaned = c;
+            cleaned.Trim();
+            if (!cleaned.IsEmpty)
+            {
+                coordList.Add(cleaned);
+            }
         }
 
         if (coordList.Count != expectedCoords)
         {
-            Console.WriteLine($"Error: {type} expects {expectedCoords} coordinates separated by '-', found {coordList.Count}.");
+            Console.WriteLine($"Error: {command} expects {expectedCoords} coordinates, found {coordList.Count}.");
             return false;
         }
 
-        for (var coord in coordList)
+        // Check each coordinate
+        for (int i = 0; i < coordList.Count; i++)
         {
+            StringView coord = coordList[i];
+
             if (coord.Length != 2)
             {
-                Console.WriteLine($"Error: Invalid coordinate format '{coord}'. Must be <x><y>.");
+                Console.WriteLine($"Error: Invalid coordinate '{coord}'. Must be 2 characters (e.g. A1).");
                 return false;
             }
 
             char8 x = coord[0];
             char8 y = coord[1];
 
+            // Validate X (Column: A to G)
             if (x < 'A' || x > 'G')
             {
-                Console.WriteLine($"Error: {coord} contains the unrecognized column variable '{x}'. Must be A-G.");
+                Console.WriteLine($"Error: {coord} contains unrecognized column variable '{x}'. Must be A-G.");
                 return false;
             }
 
+            // Validate Y (Row: 1 to 6)
             if (y < '1' || y > '6')
             {
                 Console.WriteLine($"Error: {coord} contains the unrecognized value {y}");
@@ -117,71 +145,39 @@ class Derivation
         return true;
     }
 
-    private static void PrintRightmostDerivation(List<StringView> instructions)
+    private static void PrintDerivation(List<StringView> instructions)
     {
-        int step = 1;
-        Console.WriteLine($"{step++:D2}  <program>               => begin <instructions> end");
+        Console.WriteLine("01  <program>               => begin <instructions> end");
+        Console.WriteLine("02                          => begin <instruction> end");
 
-        // Step 1: Expand <instructions> rightward
-        if (instructions.Count == 1)
+        for (int i = 0; i < instructions.Count; i++)
         {
-            Console.WriteLine($"{step++:D2}                          => begin <instruction> end");
-            DeriveSingleInstruction(ref step, instructions[0]);
-        }
-        else
-        {
-            // Structural rightmost derivation expansion for multiple instructions
-            Console.WriteLine($"{step++:D2}                          => begin <instruction> . <instructions> end");
-            
-            // Expand remaining instructions sequence
-            for (int i = 1; i < instructions.Count; i++)
+            StringView inst = instructions[i];
+
+            if (inst.StartsWith("SQR"))
             {
-                Console.WriteLine($"{step++:D2}                          => begin ... . {instructions[i]} end");
+                Console.WriteLine("03                          => begin ... SQR <coord>-<coord> ... end");
+            }
+            else
+            {
+                Console.WriteLine("03                          => begin ... TRI <coord>-<coord>-<coord> ... end");
             }
 
-            for (int i = 0; i < instructions.Count; i++)
-            {
-                DeriveSingleInstruction(ref step, instructions[i]);
+            Console.WriteLine($"04                          => begin ... {inst} ... end");
+        }
+
+        // Reconstruct full output sentence
+        String fullSentence = scope .("begin ");
+        for (int i = 0; i < instructions.Count; i++)
+        {
+            if (i > 0) {
+            	fullSentence.Append(" . ");
             }
+            fullSentence.Append(instructions[i]);
         }
-    }
+        fullSentence.Append(" end");
 
-    private static void DeriveSingleInstruction(ref int step, StringView inst)
-    {
-        List<StringView> parts = scope .();
-        for (var p in inst.Split(' '))
-        {
-            StringView partStr = p;
-            partStr.Trim();
-            if (!partStr.IsEmpty) parts.Add(partStr);
-        }
-
-        StringView type = parts[0];
-        List<StringView> coords = scope .();
-        for (var c in parts[1].Split('-'))
-        {
-            StringView cStr = c;
-            cStr.Trim();
-            coords.Add(cStr);
-        }
-
-        if (type == "SQR")
-        {
-            Console.WriteLine($"{step++:D2}                          => begin ... SQR <coord>-<coord> ... end");
-            Console.WriteLine($"{step++:D2}                          => begin ... SQR <coord>-<x><y> ... end");
-            Console.WriteLine($"{step++:D2}                          => begin ... SQR <coord>-<x>{coords[1][1]} ... end");
-            Console.WriteLine($"{step++:D2}                          => begin ... SQR <coord>-{coords[1]} ... end");
-            Console.WriteLine($"{step++:D2}                          => begin ... SQR <x><y>-{coords[1]} ... end");
-            Console.WriteLine($"{step++:D2}                          => begin ... SQR <x>{coords[0][1]}-{coords[1]} ... end");
-            Console.WriteLine($"{step++:D2}                          => begin ... SQR {coords[0]}-{coords[1]} ... end");
-        }
-        else if (type == "TRI")
-        {
-            Console.WriteLine($"{step++:D2}                          => begin ... TRI <coord>-<coord>-<coord> ... end");
-            Console.WriteLine($"{step++:D2}                          => begin ... TRI <coord>-<coord>-{coords[2]} ... end");
-            Console.WriteLine($"{step++:D2}                          => begin ... TRI <coord>-{coords[1]}-{coords[2]} ... end");
-            Console.WriteLine($"{step++:D2}                          => begin ... TRI {coords[0]}-{coords[1]}-{coords[2]} ... end");
-        }
+        Console.WriteLine($"=> Final Sentence: {fullSentence}\n");
     }
 
     private static ParseTreeNode BuildTree(List<StringView> instructions)
@@ -191,39 +187,47 @@ class Derivation
 
         ParseTreeNode instructionsNode = new ParseTreeNode("<instructions>");
 
-        for (var instStr in instructions)
+        for (int i = 0; i < instructions.Count; i++)
         {
             ParseTreeNode instNode = new ParseTreeNode("<instruction>");
-            
+
             List<StringView> parts = scope .();
-            for (var p in instStr.Split(' '))
+            for (var p in instructions[i].Split(' '))
             {
-                StringView partStr = p;
-                partStr.Trim();
-                if (!partStr.IsEmpty) parts.Add(partStr);
+                StringView cleaned = p;
+                cleaned.Trim();
+                if (!cleaned.IsEmpty)
+                {
+                    parts.Add(cleaned);
+                }
             }
 
-            instNode.AddChild(new ParseTreeNode(parts[0])); // SQR or TRI
+            // Add Command (SQR or TRI)
+            instNode.AddChild(new ParseTreeNode(parts[0]));
 
+            // Add Coordinates
             List<StringView> coords = scope .();
             for (var c in parts[1].Split('-'))
             {
-                StringView cStr = c;
-                cStr.Trim();
-                coords.Add(cStr);
+                StringView cleaned = c;
+                cleaned.Trim();
+                coords.Add(cleaned);
             }
 
-            for (int i = 0; i < coords.Count; i++)
+            for (int j = 0; j < coords.Count; j++)
             {
-                if (i > 0) instNode.AddChild(new ParseTreeNode("-"));
+                if (j > 0)
+                {
+                    instNode.AddChild(new ParseTreeNode("-"));
+                }
 
                 ParseTreeNode coordNode = new ParseTreeNode("<coord>");
-                
+
                 ParseTreeNode xNode = new ParseTreeNode("<x>");
-                xNode.AddChild(new ParseTreeNode(scope $"{coords[i][0]}"));
-                
+                xNode.AddChild(new ParseTreeNode(scope $"{coords[j][0]}"));
+
                 ParseTreeNode yNode = new ParseTreeNode("<y>");
-                yNode.AddChild(new ParseTreeNode(scope $"{coords[i][1]}"));
+                yNode.AddChild(new ParseTreeNode(scope $"{coords[j][1]}"));
 
                 coordNode.AddChild(xNode);
                 coordNode.AddChild(yNode);
