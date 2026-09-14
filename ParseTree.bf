@@ -18,26 +18,14 @@ class ParseTreeNode
         Children.Add(child);
     }
 
-    public void PrintTree(String indent = "", bool isLast = true)
-	{
-	    Console.Write(indent);
-	    if (isLast)
-	        Console.Write("└── ");
-	    else
-	        Console.Write("├── ");
+    public void PrintTree(StringView indent = "", bool isLast = true)
+    {
+        Console.WriteLine($"{indent}{(isLast ? "└── " : "├── ")}{Name}");
 
-	    Console.WriteLine(Name);
-
-	    String newIndent = scope .();
-	    newIndent.Append(indent);
-	    if (isLast)
-	        newIndent.Append("    ");
-	    else
-	        newIndent.Append("│   ");
-
-	    for (int i = 0; i < Children.Count; i++)
-	    {
-	        Children[i].PrintTree(newIndent, i == Children.Count - 1);
-	    }
-	}
+        String newIndent = scope $"{indent}{(isLast ? "    " : "│   ")}";
+        for (int i = 0; i < Children.Count; i++)
+        {
+            Children[i].PrintTree(newIndent, i == Children.Count - 1);
+        }
+    }
 }
